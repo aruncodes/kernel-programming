@@ -1,0 +1,23 @@
+--- org-fault.c	2015-01-29 16:04:49.101912083 +0530
++++ linux-3.18.1/arch/x86/mm/fault.c	2015-01-29 16:05:23.638172829 +0530
+@@ -1055,6 +1055,8 @@
+  * {,trace_}do_page_fault() have notrace on. Having this an actual function
+  * guarantees there's a function trace entry.
+  */
++ int (*pf_hook)(struct task_struct *tsk,unsigned long address) = NULL;
++ EXPORT_SYMBOL(pf_hook);
+ static noinline void
+ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
+ 		unsigned long address)
+@@ -1236,6 +1238,11 @@
+ 	 * the fault.  Since we never set FAULT_FLAG_RETRY_NOWAIT, if
+ 	 * we get VM_FAULT_RETRY back, the mmap_sem has been unlocked.
+ 	 */
++	 //Custom page fault handling
++ 	if(pf_hook != NULL) {
++ 		pf_hook(current,address);
++ 	}	
++	//End custom handling
+ 	fault = handle_mm_fault(mm, vma, address, flags);
+ 
+ 	/*
