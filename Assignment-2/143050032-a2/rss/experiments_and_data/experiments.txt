@@ -1,0 +1,37 @@
+
+EXPERIEMENTS AND DATA
+
+Estimating RSS of following processes
+Actual RSS is taken from "ps -eo pid,comm,rss"
+
+1. BASH Shell
+	Process Name: bash
+	PID			: 2652
+	Actual RSS	: 4600
+	Esti. RSS	: 4604
+
+2. init
+	Process Name: init
+	PID			: 1
+	Actual RSS	: 3700
+	Esti. RSS	: 3704
+
+3. LX Terminal
+	Process Name: lxterminal
+	PID			: 2812
+	Actual RSS	: 23100
+	Esti. RSS	: 23268
+
+4. Firefox
+	Process Name: firefox
+	PID			: 3218
+	Actual RSS	: 149916
+	Esti. RSS	: 150908
+
+5. Leafpad (text editor)
+	Process Name: leafpad
+	PID			: 3976
+	Actual RSS	: 19412
+	Esti. RSS	: 19448
+
+

@@ -1,0 +1,79 @@
+[12528.314703] Module started..
+[12528.314703] Page size : 4096
+[12528.314712] Process name with PID 6167 is : jumper
+Accessing 36 elements in array
+[12538.336181] WSS : 61 RSS : 1204 VMA : 2236
+Accessing 27 elements in array
+[12548.353030] WSS : 55 RSS : 1216 VMA : 2236
+Accessing 15 elements in array
+[12558.368170] WSS : 43 RSS : 1216 VMA : 2236
+Accessing 43 elements in array
+[12568.384142] WSS : 64 RSS : 1216 VMA : 2236
+Accessing 35 elements in array
+[12578.400174] WSS : 63 RSS : 1244 VMA : 2236
+Accessing 36 elements in array
+[12588.416155] WSS : 64 RSS : 1244 VMA : 2236
+[12588.416420] Completed.. Please remove module.
+
+[ 9087.546641] Module started..
+[ 9087.546641] Page size : 4096
+[ 9087.546649] Process name with PID 5076 is : leafpad
+[ 9097.568144] WSS : 1764 RSS : 20724 VMA : 175504
+[ 9107.584141] WSS : 793 RSS : 21020 VMA : 175752
+[ 9107.585096] Completed.. Please remove module.
+[ 9119.691414] Module exit
+
+[12336.650860] Module started..
+[12336.650860] Page size : 4096
+[12336.650872] Process name with PID 5860 is : mtpaint
+[12346.656170] WSS : 1790 RSS : 19524 VMA : 29584
+[12356.672084] WSS : 1623 RSS : 19880 VMA : 29216
+[12366.688177] WSS : 1530 RSS : 20136 VMA : 29236
+[12376.704180] WSS : 1486 RSS : 20168 VMA : 29748
+[12386.720180] WSS : 1392 RSS : 20516 VMA : 29612
+[12386.721146] Completed.. Please remove module.
+[12405.569811] Module exit
+
+[14164.546851] Module started..
+[14164.546851] Page size : 4096
+[14164.546861] Process name with PID 6724 is : jumper
+Accessing 36 elements in array
+[14174.560165] WSS : 61 RSS : 1344 VMA : 2236
+Accessing 27 elements in array
+[14184.576128] WSS : 55 RSS : 1356 VMA : 2236
+Accessing 15 elements in array
+[14194.592120] WSS : 43 RSS : 1356 VMA : 2236
+Accessing 43 elements in array
+[14204.608172] WSS : 64 RSS : 1356 VMA : 2236
+Accessing 35 elements in array
+[14214.624152] WSS : 63 RSS : 1384 VMA : 2236
+Accessing 36 elements in array
+[14224.640159] WSS : 64 RSS : 1384 VMA : 2236
+Accessing 42 elements in array
+[14234.656146] WSS : 70 RSS : 1384 VMA : 2236
+Accessing 49 elements in array
+[14244.672125] WSS : 71 RSS : 1384 VMA : 2236
+Accessing 21 elements in array
+[14254.688138] WSS : 49 RSS : 1408 VMA : 2236
+Accessing 12 elements in array
+[14264.704167] WSS : 40 RSS : 1408 VMA : 2236
+Accessing 27 elements in array
+[14274.720121] WSS : 55 RSS : 1408 VMA : 2236
+Accessing 40 elements in array
+[14284.736170] WSS : 68 RSS : 1408 VMA : 2236
+Accessing 9 elements in array
+[14294.752999] WSS : 37 RSS : 1408 VMA : 2236
+Accessing 13 elements in array
+[14304.768170] WSS : 41 RSS : 1408 VMA : 2236
+Accessing 26 elements in array
+[14314.784170] WSS : 54 RSS : 1408 VMA : 2236
+Accessing 40 elements in array
+[14324.800957] WSS : 68 RSS : 1408 VMA : 2236
+Accessing 26 elements in array
+[14334.816163] WSS : 54 RSS : 1408 VMA : 2236
+Accessing 22 elements in array
+[14344.832164] WSS : 50 RSS : 1408 VMA : 2236
+Accessing 36 elements in array
+[14354.848187] WSS : 64 RSS : 1408 VMA : 2236
+[14354.848316] Completed.. Please remove module.
+[14372.424423] Module exit

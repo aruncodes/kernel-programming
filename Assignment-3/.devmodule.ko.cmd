@@ -1,0 +1,1 @@
+cmd_/home/arun/KernelProg/Assignment-3/devmodule.ko := ld -r -m elf_i386 -T ./scripts/module-common.lds --build-id  -o /home/arun/KernelProg/Assignment-3/devmodule.ko /home/arun/KernelProg/Assignment-3/devmodule.o /home/arun/KernelProg/Assignment-3/devmodule.mod.o
