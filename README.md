@@ -4,7 +4,7 @@
 **Shortest Seek Time First IO Scheduler **
 (See folder Project) [Work in Progress]
 
-#### Other exercises modules 
+#### Other exercise's modules 
 ** Kernel DS ** (See Kernel_DS folder)
 
 ** Virtual Memory Related ** (See MM_VMA folder)
