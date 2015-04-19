@@ -4,8 +4,48 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 
+#include "proc-prio.h"
+
 unsigned long READ_DEADLINE = 2; //Milliseconds
 unsigned long WRITE_DEADLINE = 3; //Milliseconds
+
+/* Proc Prio show and store */
+static ssize_t proc_prio_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	int ret = 0,i;
+	ret += sprintf(buf,"%4s %10s\n","PID","Deadline");
+
+	for (i = 0; i < NPROC; ++i) {
+		if(proc_array[i].pid > 0) { /*Neither Deleted nor Not used*/ 
+			ret += sprintf(buf + ret,"%4d %8lums\n",proc_array[i].pid,proc_array[i].deadline );
+		}
+	}
+	if(ret < 20)ret += sprintf(buf+ret,"\nNo priority entries added!"); 
+
+	ret += sprintf(buf+ret,"\n\nTo add/change priority,\n\techo 'pid deadline_in_ms' > proc_prio");
+	ret += sprintf(buf+ret,"\nTo remove entry, \n\techo 'pid 0' > proc_prio\n");
+
+	return ret;
+}
+static ssize_t proc_prio_store(struct kobject *kobj, struct kobj_attribute *attr,
+			 const char *buf, size_t count)
+{
+	int pid;
+	unsigned long deadline;
+	if(sscanf(buf,"%d %ld",&pid,&deadline)) {
+		if(deadline > 0) {
+			add_update_proc(pid,deadline);
+			printk(KERN_INFO"Added %d %lu\n",pid,deadline);
+		} else {
+			invalidate(pid);
+			printk(KERN_INFO"Removed %d\n",pid);
+		}
+
+		return count;
+	} 
+	return 0;
+}
 
 /*
  * The "read_deadline" file .
@@ -48,6 +88,9 @@ static struct kobj_attribute read_deadline_attribute =
 static struct kobj_attribute write_deadline_attribute =
 	__ATTR(write_deadline, 0664, write_deadline_show, write_deadline_store);
 
+static struct kobj_attribute proc_prio_attribute =
+	__ATTR(proc_prio, 0664, proc_prio_show, proc_prio_store);
+
 
 /*
  * Create a group of attributes so that we can create and destroy them all
@@ -56,6 +99,7 @@ static struct kobj_attribute write_deadline_attribute =
 static struct attribute *attrs[] = {
 	&read_deadline_attribute.attr,
 	&write_deadline_attribute.attr,
+	&proc_prio_attribute.attr,
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 

@@ -9,6 +9,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 
+#include "proc-prio.h"
 #include "sysfs-entry.h"
 
 struct sstf_data {
@@ -29,15 +30,7 @@ static int sstf_dispatch(struct request_queue *q, int force)
 	struct sstf_data *nd = q->elevator->elevator_data;
 	sector_t sector,min=0;
 	long abs;
-/*
-	if (!list_empty(&nd->queue)) {
-		struct request *rq;
-		rq = list_entry(nd->queue.next, struct request, queuelist);
-		list_del_init(&rq->queuelist);
-		elv_dispatch_sort(q, rq);
-		return 1;
-	}
-*/
+
 	if (!list_empty(&nd->queue)) {
 		struct request *rq, *next_rq = NULL;
 
@@ -104,17 +97,26 @@ static void sstf_add_request(struct request_queue *q, struct request *rq)
 	struct sstf_data *nd = q->elevator->elevator_data;
 	unsigned long deadline;
 
-	//Read flag of comming request to see if its a read or write
-	int write_request = rq->cmd_flags & REQ_WRITE;
+	//Get PID of current process
+	deadline = get_prio(current->pid);
 
-	if(write_request) {
-		//Write request
-		// deadline = (WRITE_DEADLINE * HZ) / 1000;
-		deadline = msecs_to_jiffies(WRITE_DEADLINE);
+	if(!deadline) {
+		//Priority was not set, so default to read write prio
+
+		//Read flag of comming request to see if its a read or write
+		int write_request = rq->cmd_flags & REQ_WRITE;
+
+		if(write_request) {
+			//Write request
+			// deadline = (WRITE_DEADLINE * HZ) / 1000;
+			deadline = msecs_to_jiffies(WRITE_DEADLINE);
+		} else {
+			//Read request
+			// deadline = (READ_DEADLINE* HZ) / 1000;
+			deadline = msecs_to_jiffies(READ_DEADLINE);
+		}
 	} else {
-		//Read request
-		// deadline = (READ_DEADLINE* HZ) / 1000;
-		deadline = msecs_to_jiffies(READ_DEADLINE);
+		printk(KERN_INFO"DL for %s(%d) set to %ldms\n",current->comm,current->pid,deadline);
 	}
 
 	//Update deadline value
@@ -192,6 +194,7 @@ static struct elevator_type elevator_noop = {
 static int __init sstf_init(void)
 {
 	init_sysfs();
+	init_prio();
 	return elv_register(&elevator_noop);
 }
 
