@@ -1,5 +1,5 @@
-#ifndef PROC_PRIO_H
-#define PROC_PRIO_H 
+#ifndef PROC_DEADLINE_H
+#define PROC_DEADLINE_H 
 
 #define NPROC 		50
 
@@ -14,7 +14,7 @@ struct proc_info {
 struct proc_info proc_array[NPROC];
 int i;
 
-unsigned long get_prio(int pid) {
+unsigned long get_deadline(int pid) {
 	for (i = 0; i < NPROC; ++i) {
 		if(proc_array[i].pid == NOT_USED) break; 
 
@@ -24,7 +24,7 @@ unsigned long get_prio(int pid) {
 	}
 	return 0;
 }
-void init_prio(void) {
+void init_dl_array(void) {
 	for (i = 0; i < NPROC; ++i)	{
 		proc_array[i].pid = NOT_USED;
 	}

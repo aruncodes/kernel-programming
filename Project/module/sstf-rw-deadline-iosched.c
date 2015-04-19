@@ -9,7 +9,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 
-#include "proc-prio.h"
+#include "proc-deadline.h"
 #include "sysfs-entry.h"
 
 struct sstf_data {
@@ -97,11 +97,11 @@ static void sstf_add_request(struct request_queue *q, struct request *rq)
 	struct sstf_data *nd = q->elevator->elevator_data;
 	unsigned long deadline;
 
-	//Get PID of current process
-	deadline = get_prio(current->pid);
+	//Get deadline of current process
+	deadline = get_deadline(current->pid);
 
 	if(!deadline) {
-		//Priority was not set, so default to read write prio
+		//Deadline was not set, so default to read write deadline
 
 		//Read flag of comming request to see if its a read or write
 		int write_request = rq->cmd_flags & REQ_WRITE;
@@ -194,7 +194,7 @@ static struct elevator_type elevator_noop = {
 static int __init sstf_init(void)
 {
 	init_sysfs();
-	init_prio();
+	init_dl_array();
 	return elv_register(&elevator_noop);
 }
 
