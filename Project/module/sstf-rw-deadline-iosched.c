@@ -109,14 +109,14 @@ static void sstf_add_request(struct request_queue *q, struct request *rq)
 		if(write_request) {
 			//Write request
 			// deadline = (WRITE_DEADLINE * HZ) / 1000;
-			deadline = msecs_to_jiffies(WRITE_DEADLINE);
+			deadline = usecs_to_jiffies(WRITE_DEADLINE);
 		} else {
 			//Read request
 			// deadline = (READ_DEADLINE* HZ) / 1000;
-			deadline = msecs_to_jiffies(READ_DEADLINE);
+			deadline = usecs_to_jiffies(READ_DEADLINE);
 		}
 	} else {
-		printk(KERN_INFO"DL for %s(%d) set to %ldms\n",current->comm,current->pid,deadline);
+		printk(KERN_INFO"DL for %s(%d) set to %ldus\n",current->comm,current->pid,deadline);
 	}
 
 	//Update deadline value
