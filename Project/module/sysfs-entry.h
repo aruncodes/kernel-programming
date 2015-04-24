@@ -6,24 +6,24 @@
 
 #include "proc-deadline.h"
 
-unsigned long READ_DEADLINE = 2; //Milliseconds
-unsigned long WRITE_DEADLINE = 3; //Milliseconds
+unsigned long READ_DEADLINE = 200; //Microseconds
+unsigned long WRITE_DEADLINE = 300; //Microseconds
 
 /* Proc deadline show and store */
 static ssize_t proc_deadline_show(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf)
 {
 	int ret = 0,i;
-	ret += sprintf(buf,"%4s %10s\n","PID","Deadline");
+	ret += sprintf(buf,"%4s %10s\n","PID","Deadline(usec)");
 
 	for (i = 0; i < NPROC; ++i) {
 		if(proc_array[i].pid > 0) { /*Neither Deleted nor Not used*/ 
-			ret += sprintf(buf + ret,"%4d %8lums\n",proc_array[i].pid,proc_array[i].deadline );
+			ret += sprintf(buf + ret,"%4d %8luus\n",proc_array[i].pid,proc_array[i].deadline );
 		}
 	}
 	if(ret < 20)ret += sprintf(buf+ret,"\nNo deadline entries added!"); 
 
-	ret += sprintf(buf+ret,"\n\nTo add/change deadline,\n\techo 'pid deadline_in_ms' > proc_deadline");
+	ret += sprintf(buf+ret,"\n\nTo add/change deadline,\n\techo 'pid deadline_in_us' > proc_deadline");
 	ret += sprintf(buf+ret,"\nTo remove entry, \n\techo 'pid 0' > proc_deadline\n");
 
 	return ret;
@@ -53,7 +53,7 @@ static ssize_t proc_deadline_store(struct kobject *kobj, struct kobj_attribute *
 static ssize_t read_deadline_show(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf)
 {
-	return sprintf(buf, "%ld msec\n",READ_DEADLINE);
+	return sprintf(buf, "%ld usec\n",READ_DEADLINE);
 }
 
 static ssize_t read_deadline_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -70,7 +70,7 @@ static ssize_t read_deadline_store(struct kobject *kobj, struct kobj_attribute *
 static ssize_t write_deadline_show(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf)
 {
-	return sprintf(buf, "%ld msec\n",WRITE_DEADLINE);
+	return sprintf(buf, "%ld usec\n",WRITE_DEADLINE);
 }
 
 static ssize_t write_deadline_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -113,7 +113,7 @@ static int init_sysfs(void)
 {
 	int retval;	
 
-	sstf_rw_deadline_kobj = kobject_create_and_add("sstf_rw_deadline", kernel_kobj);
+	sstf_rw_deadline_kobj = kobject_create_and_add("sstf_rw_deadline", NULL);
 	if (!sstf_rw_deadline_kobj)
 		return -ENOMEM;
 
