@@ -1,0 +1,463 @@
+diff -uN linux-3.18.1/block-old/Kconfig.iosched linux-3.18.1/block/Kconfig.iosched
+--- linux-3.18.1/block-old/Kconfig.iosched	2014-12-16 23:09:45.000000000 +0530
++++ linux-3.18.1/block/Kconfig.iosched	2015-04-25 00:17:18.505728691 +0530
+@@ -2,6 +2,13 @@
+ 
+ menu "IO Schedulers"
+ 
++config IOSCHED_SSTF
++	bool
++	default y
++	---help---
++	 Shortest Seek Time First IO Scheduler with Read-Write Deadline 
++	 and Per process deadline/ Configurable via SYSFS
++
+ config IOSCHED_NOOP
+ 	bool
+ 	default y
+@@ -54,6 +61,9 @@
+ 
+ 	config DEFAULT_NOOP
+ 		bool "No-op"
++	
++	config DEFAULT_SSTF
++		bool "SSTF" if IOSCHED_SSTF=y
+ 
+ endchoice
+ 
+@@ -62,6 +72,7 @@
+ 	default "deadline" if DEFAULT_DEADLINE
+ 	default "cfq" if DEFAULT_CFQ
+ 	default "noop" if DEFAULT_NOOP
++	default "sstf-rw-deadline" if DEFAULT_SSTF
+ 
+ endmenu
+ 
+diff -uN linux-3.18.1/block-old/Makefile linux-3.18.1/block/Makefile
+--- linux-3.18.1/block-old/Makefile	2014-12-16 23:09:45.000000000 +0530
++++ linux-3.18.1/block/Makefile	2015-04-25 00:13:11.927516289 +0530
+@@ -16,6 +16,7 @@
+ obj-$(CONFIG_BLK_CGROUP)	+= blk-cgroup.o
+ obj-$(CONFIG_BLK_DEV_THROTTLING)	+= blk-throttle.o
+ obj-$(CONFIG_IOSCHED_NOOP)	+= noop-iosched.o
++obj-$(CONFIG_IOSCHED_SSTF)	+= sstf-rw-deadline-iosched.o
+ obj-$(CONFIG_IOSCHED_DEADLINE)	+= deadline-iosched.o
+ obj-$(CONFIG_IOSCHED_CFQ)	+= cfq-iosched.o
+ 
+Common subdirectories: linux-3.18.1/block-old/partitions and linux-3.18.1/block/partitions
+diff -uN linux-3.18.1/block-old/proc-deadline.h linux-3.18.1/block/proc-deadline.h
+--- linux-3.18.1/block-old/proc-deadline.h	1970-01-01 05:30:00.000000000 +0530
++++ linux-3.18.1/block/proc-deadline.h	2015-04-19 19:59:55.126813000 +0530
+@@ -0,0 +1,55 @@
++#ifndef PROC_DEADLINE_H
++#define PROC_DEADLINE_H 
++
++#define NPROC 		50
++
++#define DELETED 	-2
++#define NOT_USED	-1
++
++struct proc_info {
++	int pid;
++	unsigned long deadline;
++};
++
++struct proc_info proc_array[NPROC];
++int i;
++
++unsigned long get_deadline(int pid) {
++	for (i = 0; i < NPROC; ++i) {
++		if(proc_array[i].pid == NOT_USED) break; 
++
++		if(proc_array[i].pid == pid) {
++			return proc_array[i].deadline;
++		}
++	}
++	return 0;
++}
++void init_dl_array(void) {
++	for (i = 0; i < NPROC; ++i)	{
++		proc_array[i].pid = NOT_USED;
++	}
++}
++
++void add_update_proc(int pid,unsigned long deadline) {
++
++	for (i = 0; i < NPROC; ++i)
++	{
++		if(proc_array[i].pid < 0 /*Deleted or Not used*/ 
++			|| proc_array[i].pid == pid) {
++			proc_array[i].pid = pid;
++			proc_array[i].deadline = deadline;
++			break;
++		}
++	}
++}
++
++void invalidate(int pid) {
++	for (i = 0; i < NPROC; ++i) {
++		if(proc_array[i].pid == pid) {
++			proc_array[i].pid = DELETED;
++			break;
++		}
++	}
++}
++
++#endif
+\ No newline at end of file
+diff -uN linux-3.18.1/block-old/sstf-rw-deadline-iosched.c linux-3.18.1/block/sstf-rw-deadline-iosched.c
+--- linux-3.18.1/block-old/sstf-rw-deadline-iosched.c	1970-01-01 05:30:00.000000000 +0530
++++ linux-3.18.1/block/sstf-rw-deadline-iosched.c	2015-04-24 15:22:57.585766000 +0530
+@@ -0,0 +1,213 @@
++/*
++ * elevator sstf with read and write deadlines
++ */
++#include <linux/blkdev.h>
++#include <linux/elevator.h>
++#include <linux/bio.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/list.h>
++
++#include "proc-deadline.h"
++#include "sysfs-entry.h"
++
++struct sstf_data {
++	struct list_head queue;
++};
++
++//Store the last dispatched sector
++sector_t last_dispatch_sector = 0;
++
++static void sstf_merged_requests(struct request_queue *q, struct request *rq,
++				 struct request *next)
++{
++	list_del_init(&next->queuelist);
++}
++
++static int sstf_dispatch(struct request_queue *q, int force)
++{
++	struct sstf_data *nd = q->elevator->elevator_data;
++	sector_t sector,min=0;
++	long abs;
++
++	if (!list_empty(&nd->queue)) {
++		struct request *rq, *next_rq = NULL;
++
++		//Iterate over request queue and find the shortest		
++		list_for_each_entry(rq,&nd->queue,queuelist) {
++
++			//Get sector
++			sector = blk_rq_pos(rq);
++
++			//Check if deadline is past, if so, then dispatch immediately
++			if(time_before(rq->deadline,jiffies)) {
++				printk(KERN_INFO "Deadline reached!");
++
++				next_rq = rq;
++				last_dispatch_sector = sector; 
++				break;
++			}
++
++			//Init vars
++			if(min == 0) {
++				min = sector;
++
++				//Just an optimization to check last dispatch inside this
++				if(last_dispatch_sector == 0) 
++					last_dispatch_sector = sector;
++			} 
++
++			//Find absolute diff between last dispatch
++			abs = last_dispatch_sector - sector; 
++			abs = abs < 0 ? -abs : abs;
++
++			//Update min distance 
++			if(min >= abs) {
++				min = abs;
++				next_rq = rq;
++			}
++
++			printk(KERN_INFO "Queue Item : %lu Diff: %ld \n", (unsigned long )sector, abs );
++		}
++
++		//Ensure next_rq will not be uninitialized
++		if(!next_rq) next_rq = list_entry(nd->queue.next, struct request, queuelist);
++
++		//Update global var
++		last_dispatch_sector = blk_rq_pos(next_rq);
++
++		//Print debug
++		printk(KERN_INFO "Dispatched : %lu\n", (unsigned long )last_dispatch_sector);
++
++		//Empty queue list and re initialize before dispatching
++		list_del_init(&next_rq->queuelist);
++
++		//Dispatch
++		elv_dispatch_sort(q,next_rq);
++
++		return 1;
++	}
++	
++	return 0;
++}
++
++static void sstf_add_request(struct request_queue *q, struct request *rq)
++{
++	struct sstf_data *nd = q->elevator->elevator_data;
++	unsigned long deadline;
++
++	//Get deadline of current process
++	deadline = get_deadline(current->pid);
++
++	if(!deadline) {
++		//Deadline was not set, so default to read write deadline
++
++		//Read flag of comming request to see if its a read or write
++		int write_request = rq->cmd_flags & REQ_WRITE;
++
++		if(write_request) {
++			//Write request
++			// deadline = (WRITE_DEADLINE * HZ) / 1000;
++			deadline = usecs_to_jiffies(WRITE_DEADLINE);
++		} else {
++			//Read request
++			// deadline = (READ_DEADLINE* HZ) / 1000;
++			deadline = usecs_to_jiffies(READ_DEADLINE);
++		}
++	} else {
++		printk(KERN_INFO"DL for %s(%d) set to %ldus\n",current->comm,current->pid,deadline);
++	}
++
++	//Update deadline value
++	rq -> deadline = jiffies + deadline;
++
++	list_add_tail(&rq->queuelist, &nd->queue);
++}
++
++static struct request *
++sstf_former_request(struct request_queue *q, struct request *rq)
++{
++	struct sstf_data *nd = q->elevator->elevator_data;
++
++	if (rq->queuelist.prev == &nd->queue)
++		return NULL;
++	return list_entry(rq->queuelist.prev, struct request, queuelist);
++}
++
++static struct request *
++sstf_latter_request(struct request_queue *q, struct request *rq)
++{
++	struct sstf_data *nd = q->elevator->elevator_data;
++
++	if (rq->queuelist.next == &nd->queue)
++		return NULL;
++	return list_entry(rq->queuelist.next, struct request, queuelist);
++}
++
++static int sstf_init_queue(struct request_queue *q, struct elevator_type *e)
++{
++	struct sstf_data *nd;
++	struct elevator_queue *eq;
++
++	eq = elevator_alloc(q, e);
++	if (!eq)
++		return -ENOMEM;
++
++	nd = kmalloc_node(sizeof(*nd), GFP_KERNEL, q->node);
++	if (!nd) {
++		kobject_put(&eq->kobj);
++		return -ENOMEM;
++	}
++	eq->elevator_data = nd;
++
++	INIT_LIST_HEAD(&nd->queue);
++
++	spin_lock_irq(q->queue_lock);
++	q->elevator = eq;
++	spin_unlock_irq(q->queue_lock);
++	return 0;
++}
++
++static void sstf_exit_queue(struct elevator_queue *e)
++{
++	struct sstf_data *nd = e->elevator_data;
++
++	BUG_ON(!list_empty(&nd->queue));
++	kfree(nd);
++}
++
++static struct elevator_type elevator_noop = {
++	.ops = {
++		.elevator_merge_req_fn		= sstf_merged_requests,
++		.elevator_dispatch_fn		= sstf_dispatch,
++		.elevator_add_req_fn		= sstf_add_request,
++		.elevator_former_req_fn		= sstf_former_request,
++		.elevator_latter_req_fn		= sstf_latter_request,
++		.elevator_init_fn		= sstf_init_queue,
++		.elevator_exit_fn		= sstf_exit_queue,
++	},
++	.elevator_name = "sstf-rw-dl",
++	.elevator_owner = THIS_MODULE,
++};
++
++static int __init sstf_init(void)
++{
++	init_sysfs();
++	init_dl_array();
++	return elv_register(&elevator_noop);
++}
++
++static void __exit sstf_exit(void)
++{
++	exit_sysfs();
++	elv_unregister(&elevator_noop);
++}
++
++module_init(sstf_init);
++module_exit(sstf_exit);
++
++
++MODULE_AUTHOR("Arun Babu");
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("SSTF with Read-Write Deadline IO scheduler");
+diff -uN linux-3.18.1/block-old/sysfs-entry.h linux-3.18.1/block/sysfs-entry.h
+--- linux-3.18.1/block-old/sysfs-entry.h	1970-01-01 05:30:00.000000000 +0530
++++ linux-3.18.1/block/sysfs-entry.h	2015-04-24 15:55:53.277642000 +0530
+@@ -0,0 +1,134 @@
++#ifndef SYSFS_ENTRY_H
++#define SYSFS_ENTRY_H 
++
++#include <linux/kobject.h>
++#include <linux/sysfs.h>
++
++#include "proc-deadline.h"
++
++unsigned long READ_DEADLINE = 200; //Microseconds
++unsigned long WRITE_DEADLINE = 300; //Microseconds
++
++/* Proc deadline show and store */
++static ssize_t proc_deadline_show(struct kobject *kobj, struct kobj_attribute *attr,
++			char *buf)
++{
++	int ret = 0,i;
++	ret += sprintf(buf,"%4s %10s\n","PID","Deadline(usec)");
++
++	for (i = 0; i < NPROC; ++i) {
++		if(proc_array[i].pid > 0) { /*Neither Deleted nor Not used*/ 
++			ret += sprintf(buf + ret,"%4d %8luus\n",proc_array[i].pid,proc_array[i].deadline );
++		}
++	}
++	if(ret < 20)ret += sprintf(buf+ret,"\nNo deadline entries added!"); 
++
++	ret += sprintf(buf+ret,"\n\nTo add/change deadline,\n\techo 'pid deadline_in_us' > proc_deadline");
++	ret += sprintf(buf+ret,"\nTo remove entry, \n\techo 'pid 0' > proc_deadline\n");
++
++	return ret;
++}
++static ssize_t proc_deadline_store(struct kobject *kobj, struct kobj_attribute *attr,
++			 const char *buf, size_t count)
++{
++	int pid;
++	unsigned long deadline;
++	if(sscanf(buf,"%d %ld",&pid,&deadline)) {
++		if(deadline > 0) {
++			add_update_proc(pid,deadline);
++			printk(KERN_INFO"Added %d %lu\n",pid,deadline);
++		} else {
++			invalidate(pid);
++			printk(KERN_INFO"Removed %d\n",pid);
++		}
++
++		return count;
++	} 
++	return 0;
++}
++
++/*
++ * The "read_deadline" file .
++ */
++static ssize_t read_deadline_show(struct kobject *kobj, struct kobj_attribute *attr,
++			char *buf)
++{
++	return sprintf(buf, "%ld usec\n",READ_DEADLINE);
++}
++
++static ssize_t read_deadline_store(struct kobject *kobj, struct kobj_attribute *attr,
++			 const char *buf, size_t count)
++{
++	if(sscanf(buf,"%ld",&READ_DEADLINE)) return count;
++
++	return 0;
++}
++
++/*
++ * The "write_deadline" file .
++ */
++static ssize_t write_deadline_show(struct kobject *kobj, struct kobj_attribute *attr,
++			char *buf)
++{
++	return sprintf(buf, "%ld usec\n",WRITE_DEADLINE);
++}
++
++static ssize_t write_deadline_store(struct kobject *kobj, struct kobj_attribute *attr,
++			 const char *buf, size_t count)
++{
++	if(sscanf(buf,"%ld",&WRITE_DEADLINE)) return count;
++
++	return 0;
++}
++
++/* Sysfs attributes cannot be world-writable. */
++static struct kobj_attribute read_deadline_attribute =
++	__ATTR(read_deadline, 0664, read_deadline_show, read_deadline_store);
++
++static struct kobj_attribute write_deadline_attribute =
++	__ATTR(write_deadline, 0664, write_deadline_show, write_deadline_store);
++
++static struct kobj_attribute proc_deadline_attribute =
++	__ATTR(proc_deadline, 0664, proc_deadline_show, proc_deadline_store);
++
++
++/*
++ * Create a group of attributes so that we can create and destroy them all
++ * at once.
++ */
++static struct attribute *attrs[] = {
++	&read_deadline_attribute.attr,
++	&write_deadline_attribute.attr,
++	&proc_deadline_attribute.attr,
++	NULL,	/* need to NULL terminate the list of attributes */
++};
++
++static struct attribute_group attr_group = {
++	.attrs = attrs,
++};
++
++static struct kobject *sstf_rw_deadline_kobj;
++
++static int init_sysfs(void)
++{
++	int retval;	
++
++	sstf_rw_deadline_kobj = kobject_create_and_add("sstf_rw_deadline", NULL);
++	if (!sstf_rw_deadline_kobj)
++		return -ENOMEM;
++
++	/* Create the files associated with this kobject */
++	retval = sysfs_create_group(sstf_rw_deadline_kobj, &attr_group);
++	if (retval)
++		kobject_put(sstf_rw_deadline_kobj);
++
++	return retval;
++}
++
++static void exit_sysfs(void)
++{
++	kobject_put(sstf_rw_deadline_kobj);
++}
++
++
++#endif
+\ No newline at end of file
