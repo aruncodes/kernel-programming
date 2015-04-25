@@ -25,6 +25,10 @@ static void sstf_merged_requests(struct request_queue *q, struct request *rq,
 	list_del_init(&next->queuelist);
 }
 
+//Debug char array
+char buf[1024];
+int pos;
+
 static int sstf_dispatch(struct request_queue *q, int force)
 {
 	struct sstf_data *nd = q->elevator->elevator_data;
@@ -34,6 +38,8 @@ static int sstf_dispatch(struct request_queue *q, int force)
 	if (!list_empty(&nd->queue)) {
 		struct request *rq, *next_rq = NULL;
 
+		pos = 0; //debug array position
+
 		//Iterate over request queue and find the shortest		
 		list_for_each_entry(rq,&nd->queue,queuelist) {
 
@@ -42,7 +48,8 @@ static int sstf_dispatch(struct request_queue *q, int force)
 
 			//Check if deadline is past, if so, then dispatch immediately
 			if(time_before(rq->deadline,jiffies)) {
-				printk(KERN_INFO "Deadline reached!");
+				// printk(KERN_INFO "Deadline reached!");
+				pos += sprintf(buf+pos,"%lu (Deadline reached!!)",(unsigned long )sector);
 
 				next_rq = rq;
 				last_dispatch_sector = sector; 
@@ -68,7 +75,8 @@ static int sstf_dispatch(struct request_queue *q, int force)
 				next_rq = rq;
 			}
 
-			printk(KERN_INFO "Queue Item : %lu Diff: %ld \n", (unsigned long )sector, abs );
+			// printk(KERN_INFO "Queue Item : %lu Diff: %ld \n", (unsigned long )sector, abs );
+			pos += sprintf(buf+pos,"%lu(%ld), ",(unsigned long )sector, abs );
 		}
 
 		//Ensure next_rq will not be uninitialized
@@ -78,7 +86,10 @@ static int sstf_dispatch(struct request_queue *q, int force)
 		last_dispatch_sector = blk_rq_pos(next_rq);
 
 		//Print debug
-		printk(KERN_INFO "Dispatched : %lu\n", (unsigned long )last_dispatch_sector);
+		if(pos > 20) { //Print if atleast 2 entries
+			printk(KERN_INFO "%s\n",buf);
+			printk(KERN_INFO "Dispatched : %lu\n\n", (unsigned long )last_dispatch_sector);
+		}
 
 		//Empty queue list and re initialize before dispatching
 		list_del_init(&next_rq->queuelist);
